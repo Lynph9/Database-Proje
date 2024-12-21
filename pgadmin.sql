@@ -1,4 +1,6 @@
-eskileri silme (varsa)
+--------------------------------------------------------------------------------
+-- Temizlik (opsiyonel): Mevcut tabloları sil
+--------------------------------------------------------------------------------
 DROP TABLE IF EXISTS mesaj CASCADE;
 DROP TABLE IF EXISTS etkinlik_katilimi CASCADE;
 DROP TABLE IF EXISTS etkinlik CASCADE;
@@ -15,7 +17,18 @@ DROP TABLE IF EXISTS yonetici CASCADE;
 DROP TABLE IF EXISTS uye CASCADE;
 DROP TABLE IF EXISTS kullanici CASCADE;
 
- Ana tablo: kullanici
+DROP FUNCTION IF EXISTS yeni_kullanici_ekle(varchar, varchar, varchar, varchar, varchar);
+DROP FUNCTION IF EXISTS kitap_ekle_function(varchar, text, date, int, int, int);
+DROP FUNCTION IF EXISTS kulup_uyeligi_ekle(int, int);
+DROP FUNCTION IF EXISTS kitap_ara(varchar);
+DROP FUNCTION IF EXISTS yorum_eklendiginde_bildirim() CASCADE;
+DROP FUNCTION IF EXISTS ortalama_puan_guncelle() CASCADE;
+DROP FUNCTION IF EXISTS mesaj_tarihi_otomatik() CASCADE;
+DROP FUNCTION IF EXISTS kullanici_silince_temizle() CASCADE;
+
+--------------------------------------------------------------------------------
+-- 1) Tablolar (15 adet) ve Inheritance
+--------------------------------------------------------------------------------
 
 CREATE TABLE kullanici (
     id SERIAL PRIMARY KEY,
@@ -23,25 +36,16 @@ CREATE TABLE kullanici (
     last_name VARCHAR(50),
     email VARCHAR(100) UNIQUE,
     password VARCHAR(100),
-    role VARCHAR(20)  -- 'uye' veya 'yonetici'
+    role VARCHAR(20) -- 'uye' veya 'yonetici'
 );
-
- uye tablosu, kullanici tablosundan Inherit (Disjoint alt varlik)
-
 
 CREATE TABLE uye (
     CHECK (role = 'uye')
 ) INHERITS (kullanici);
 
- yonetici tablosu, kullanici tablosundan Inherit (Disjoint alt varlik)
-
-
 CREATE TABLE yonetici (
     CHECK (role = 'yonetici')
 ) INHERITS (kullanici);
-
-  Diğer tablolar
-
 
 CREATE TABLE yazar (
     id SERIAL PRIMARY KEY,
@@ -129,11 +133,8 @@ CREATE TABLE mesaj (
 );
 
 --------------------------------------------------------------------------------
--- 2. Saklı Yordamlar / Fonksiyonlar ve Tetikleyiciler (Örnek 4 fonksiyon, 4 trigger)
+-- 2) Fonksiyonlar (4 adet)
 --------------------------------------------------------------------------------
-
- Fonksiyon: yeni_kullanici_ekle (void)
-
 
 CREATE OR REPLACE FUNCTION yeni_kullanici_ekle(
     p_first_name VARCHAR,
@@ -144,14 +145,10 @@ CREATE OR REPLACE FUNCTION yeni_kullanici_ekle(
 )
 RETURNS void AS $$
 BEGIN
-    INSERT INTO kullanici (first_name, last_name, email, password, role)
+    INSERT INTO kullanici(first_name, last_name, email, password, role)
     VALUES (p_first_name, p_last_name, p_email, p_password, p_role);
-END; 
+END;
 $$ LANGUAGE plpgsql;
-
- Fonksiyon: kitap_ekle_function
-
-
 
 CREATE OR REPLACE FUNCTION kitap_ekle_function(
     p_title VARCHAR,
@@ -168,11 +165,6 @@ BEGIN
 END; 
 $$ LANGUAGE plpgsql;
 
- Fonksiyon: kulup_uyeligi_ekle
-
-
-
-
 CREATE OR REPLACE FUNCTION kulup_uyeligi_ekle(
     p_club_id INT,
     p_user_id INT
@@ -183,12 +175,6 @@ BEGIN
     VALUES (p_club_id, p_user_id);
 END;
 $$ LANGUAGE plpgsql;
-
- Fonksiyon: kitap_ara (Returns Table)
-
-
-
-
 
 CREATE OR REPLACE FUNCTION kitap_ara(p_search_term VARCHAR)
 RETURNS TABLE (
@@ -210,16 +196,9 @@ BEGIN
 END;
 $$;
 
-
-
-
--- Tetikleyiciler (4 adet):
-
-
-
--- 1) Yorum eklendiğinde bildirim:
-
-
+--------------------------------------------------------------------------------
+-- 3) Tetikleyiciler (4 adet)
+--------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION yorum_eklendiginde_bildirim() 
 RETURNS TRIGGER AS $$
@@ -233,9 +212,6 @@ CREATE TRIGGER trg_yorum_eklendi_bildirim
 AFTER INSERT ON yorum
 FOR EACH ROW
 EXECUTE PROCEDURE yorum_eklendiginde_bildirim();
-
--- 2) Ortalama puan güncelleme:
-
 
 CREATE OR REPLACE FUNCTION ortalama_puan_guncelle() 
 RETURNS TRIGGER AS $$
@@ -257,10 +233,6 @@ AFTER INSERT OR UPDATE ON degerlendirme
 FOR EACH ROW
 EXECUTE PROCEDURE ortalama_puan_guncelle();
 
--- 3) Mesaj tarihini otomatik atama:
-
-
-
 CREATE OR REPLACE FUNCTION mesaj_tarihi_otomatik() 
 RETURNS TRIGGER AS $$
 BEGIN
@@ -273,10 +245,6 @@ CREATE TRIGGER trg_mesaj_tarihi_otomatik
 BEFORE INSERT ON mesaj
 FOR EACH ROW
 EXECUTE PROCEDURE mesaj_tarihi_otomatik();
-
--- 4) Kullanici silindiğinde bağlı verileri temizleme:
-
-
 
 CREATE OR REPLACE FUNCTION kullanici_silince_temizle()
 RETURNS TRIGGER AS $$
@@ -292,20 +260,15 @@ FOR EACH ROW
 EXECUTE PROCEDURE kullanici_silince_temizle();
 
 --------------------------------------------------------------------------------
--- 3. Örnek Veri Ekleme
+-- 4) Örnek Veri Ekleyelim (Opsiyonel)
 --------------------------------------------------------------------------------
 
--- yazar, yayinevi, kategori, kitap_kulubu tablolarına en azından birkaç satır eklersek;
-INSERT INTO yazar(first_name, last_name) VALUES ('Ahmet', 'Ümit'), ('Elif', 'Şafak');
-INSERT INTO yayinevi(name) VALUES ('Can Yayınları'), ('Doğan Kitap');
-INSERT INTO kategori(name) VALUES ('Roman'), ('Deneme');
-INSERT INTO kitap_kulubu(name, description) VALUES('Okuma Kulübü', 'Her ay yeni kitap incelemesi.');
+-- Yazar, Yayınevi, Kategori ekleme
+INSERT INTO yazar(first_name, last_name) VALUES ('Antoine', 'Exupery'), ('Elif', 'Safak');
+INSERT INTO yayinevi(name) VALUES ('Gallimard'), ('Can Yayincilik');
+INSERT INTO kategori(name) VALUES('Children Literature'), ('Roman');
 
--- Kullanıcı eklemek için fonksiyon testi;
+-- Bir adet kulüp ekleyelim
+INSERT INTO kitap_kulubu(name, description) VALUES('Okuma Kulübü', 'Her ay yeni kitap incelemesi');
 
-
-SELECT yeni_kullanici_ekle('Mehmet', 'Sensoy', 'mehmet@msn.com', '123', 'uye');
-SELECT yeni_kullanici_ekle('Ayşe', 'Yılmaz', 'ayse@msn.com', '123', 'yonetici');
-
--- Artık bu veriler tabloya kaydedildi.
 COMMIT;
